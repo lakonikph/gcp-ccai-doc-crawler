@@ -5,7 +5,7 @@ import { convert } from "html-to-text";
   // -----------------------------------------------------------
   // Open Browser
   // -----------------------------------------------------------
-  const browser = await puppeteer.launch({ headless: false, args: ["--window-size=1920,1080"] });
+  const browser = await puppeteer.launch({ headless: true, args: ["--window-size=1920,1080"] });
   const page = await browser.newPage();
   await page.setViewport({ width: 1920, height: 1080 });
   // Set screen size
@@ -41,13 +41,24 @@ import { convert } from "html-to-text";
   // -----------------------------------------------------------
   // Visit Each URL
   // -----------------------------------------------------------
-  for (const link of links) {
-    console.log("Now visiting: " + link);
-    await page.goto(link.link);
-    await page.waitForSelector(".devsite-page-title");
-    const siteArticleElement = await page.waitForSelector(".devsite-article");
+  for (const link in links) {
+    const current = links[link];
+
+    console.log(`Processing Pages ${parseInt(link) + 1} / ${links.length}: ${current.link}`);
+    await page.goto(current.link);
+    const siteArticleElement = await page.waitForSelector(".devsite-article-body");
     const siteArticleElementText = await siteArticleElement?.evaluate((el) => el.outerHTML);
-    console.log(convert(siteArticleElementText));
+    const textContent = convert(siteArticleElementText);
+
+    const data = {
+      link: current.link,
+      title: current.text,
+      content: textContent,
+      time: +new Date(),
+    };
+
+    console.log(JSON.stringify(data, null, 2));
+    break;
   }
 
   // https://stackoverflow.com/questions/76693754/typescript-console-lines-are-not-cleared-properly
