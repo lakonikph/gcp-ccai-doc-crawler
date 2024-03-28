@@ -2,14 +2,17 @@ import puppeteer from "puppeteer";
 import { convert } from "html-to-text";
 
 (async () => {
-  // Launch the browser and open a new blank page
+  // -----------------------------------------------------------
+  // Open Browser
+  // -----------------------------------------------------------
   const browser = await puppeteer.launch({ headless: false, args: ["--window-size=1920,1080"] });
   const page = await browser.newPage();
-
-  // Set screen size
   await page.setViewport({ width: 1920, height: 1080 });
+  // Set screen size
 
-  // Navigate the page to a URL
+  // -----------------------------------------------------------
+  // Navigate to Home URL
+  // -----------------------------------------------------------
   await page.goto("https://cloud.google.com/contact-center/ccai-platform/docs");
   const siteTitleElement = await page.waitForSelector(".devsite-page-title");
   const siteTitleText = await siteTitleElement?.evaluate((el) => el.textContent);
@@ -18,8 +21,10 @@ import { convert } from "html-to-text";
     await browser.close();
   }
 
+  // -----------------------------------------------------------
+  // Getll All URLs
+  // -----------------------------------------------------------
   const navigationLinkElements = await page.$$("ul.devsite-nav-list[menu=_book] a", (a) => a);
-
   const links = (
     await Promise.all(
       navigationLinkElements.map(async (a) => {
@@ -33,6 +38,9 @@ import { convert } from "html-to-text";
     )
   ).filter((link) => link.text !== "");
 
+  // -----------------------------------------------------------
+  // Visit Each URL
+  // -----------------------------------------------------------
   for (const link of links) {
     console.log("Now visiting: " + link);
     await page.goto(link.link);
