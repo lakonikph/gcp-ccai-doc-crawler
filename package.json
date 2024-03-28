@@ -1,0 +1,24 @@
+{
+  "name": "gcp-ccai-doc-crawler",
+  "version": "0.0.1",
+  "description": "Web crawler specifically created for CCAI.",
+  "main": "index.mjs",
+  "scripts": {
+    "dev": "node ./index.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lakonikph/gcp-ccai-doc-crawler.git"
+  },
+  "author": "lakonik.dev@outlook.com",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/lakonikph/gcp-ccai-doc-crawler/issues"
+  },
+  "homepage": "https://github.com/lakonikph/gcp-ccai-doc-crawler#readme",
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "html-to-text": "^9.0.5",
+    "puppeteer": "^22.6.1"
+  }
+}
