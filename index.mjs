@@ -1,90 +1,129 @@
 import puppeteer from "puppeteer";
 import { convert } from "html-to-text";
+import fs from "fs/promises";
 
-(async () => {
-  // -----------------------------------------------------------
-  // Open Browser
-  // -----------------------------------------------------------
-  const browser = await puppeteer.launch({ headless: true, args: ["--window-size=1920,1080"] });
+const openBrowser = async () => {
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ["--window-size=1920,1080"],
+  });
   const page = await browser.newPage();
-  await page.setViewport({ width: 1920, height: 1080 });
   // Set screen size
+  await page.setViewport({ width: 1920, height: 1080 });
+  return page;
+};
 
-  // -----------------------------------------------------------
-  // Navigate to Home URL
-  // -----------------------------------------------------------
-  await page.goto("https://cloud.google.com/contact-center/ccai-platform/docs");
+const openPage = async (page, url, title) => {
+  await page.goto(url);
   const siteTitleElement = await page.waitForSelector(".devsite-page-title");
-  const siteTitleText = await siteTitleElement?.evaluate((el) => el.textContent);
-  if (siteTitleText !== "CCAI Platform") {
-    console.info("Unexpected Site.");
-    await browser.close();
+  const siteTitleText = await siteTitleElement?.evaluate(
+    (el) => el.textContent
+  );
+  if (siteTitleText !== title) {
+    throw new Error("Unexpected Title!");
   }
+};
 
-  // -----------------------------------------------------------
-  // Getll All URLs
-  // -----------------------------------------------------------
-  const navigationLinkElements = await page.$$("ul.devsite-nav-list[menu=_book] a", (a) => a);
+const getLinks = async (page) => {
+  const navigationLinkElements = await page.$$(
+    "ul.devsite-nav-list[menu=_book] a",
+    (a) => a
+  );
   const links = (
     await Promise.all(
       navigationLinkElements.map(async (a) => {
         return await page.evaluate((link) => {
           return {
-            link: "https://cloud.google.com" + link.getAttribute("href"),
+            link: link.getAttribute("href"),
             text: link.textContent,
           };
         }, a);
       })
     )
-  ).filter((link) => link.text !== "");
+  )
+    .filter((link) => link.text !== "" && !link.link.startsWith("https://"))
+    .map((link) => {
+      return { link: "https://cloud.google.com" + link.link, text: link.text };
+    });
+  return links;
+};
 
-  // -----------------------------------------------------------
-  // Visit Each URL
-  // -----------------------------------------------------------
+const writeData = async (page, links) => {
   for (const link in links) {
     const current = links[link];
 
-    console.log(`Processing Pages ${parseInt(link) + 1} / ${links.length}: ${current.link}`);
+    console.log(
+      `Processing Pages ${parseInt(link) + 1} / ${links.length}: ${
+        current.link
+      }`
+    );
     await page.goto(current.link);
-    const siteArticleElement = await page.waitForSelector(".devsite-article-body");
-    const siteArticleElementText = await siteArticleElement?.evaluate((el) => el.outerHTML);
+    const siteArticleElement = await page.waitForSelector(
+      ".devsite-article-body"
+    );
+    const siteArticleElementText = await siteArticleElement?.evaluate(
+      (el) => el.outerHTML
+    );
     const textContent = convert(siteArticleElementText);
 
     const data = {
       link: current.link,
       title: current.text,
       content: textContent,
-      time: +new Date(),
     };
 
-    console.log(JSON.stringify(data, null, 2));
-    break;
+    await fs.writeFile("data.ndjson", JSON.stringify(data) + "\n", {
+      encoding: "utf8",
+      flag: "a+",
+    });
   }
+};
 
-  // https://stackoverflow.com/questions/76693754/typescript-console-lines-are-not-cleared-properly
-  // https://www.npmjs.com/package/chalk
+(async () => {
+  // -----------------------------------------------------------
+  // Open Browser
+  // -----------------------------------------------------------
+  const page = await openBrowser();
 
-  // for (const navigationLinkElement of navigationLinkElements) {
-  //   const href = await page.evaluate(
-  //     (anchor) => anchor.getAttribute("href"),
-  //     navigationLinkElement
-  //   );
-  // }
+  // -----------------------------------------------------------
+  // Navigate to Home URL
+  // -----------------------------------------------------------
+  await openPage(
+    page,
+    "https://cloud.google.com/contact-center/ccai-platform/docs",
+    "CCAI Platform"
+  );
+  // -----------------------------------------------------------
+  // Getll All URLs
+  // -----------------------------------------------------------
+  const ccaiLinks = await getLinks(page);
 
-  // // Type into search box
-  // await page.type(".devsite-search-field", "automate beyond recorder");
+  // -----------------------------------------------------------
+  // Navigate to Home URL
+  // -----------------------------------------------------------
+  await openPage(
+    page,
+    "https://cloud.google.com/agent-assist/docs",
+    "Agent Assist documentation"
+  );
 
-  // // Wait and click on first result
-  // const searchResultSelector = ".devsite-result-item-link";
+  const agentAssitLinks = (await getLinks(page)).filter(
+    (link) => link.text !== "Overview"
+  );
 
-  // await page.click(searchResultSelector);
+  await openPage(
+    page,
+    "https://cloud.google.com/dialogflow/cx/docs",
+    "Dialogflow CX documentation"
+  );
 
-  // // Locate the full title with a unique string
-  // const textSelector = await page.waitForSelector("text/Customize and automate");
-  // const fullTitle = await textSelector?.evaluate((el) => el.textContent);
+  const dfcxLinks = await getLinks(page);
 
-  // // Print the full title
-  // console.log('The title of this blog post is "%s".', fullTitle);
-
-  // await browser.close();
+  console.log(dfcxLinks);
+  const links = [...ccaiLinks, ...agentAssitLinks, ...dfcxLinks];
+  // -----------------------------------------------------------
+  // Visit Each URL
+  // -----------------------------------------------------------
+  await writeData(page, links);
+  throw new Error("Completion Crash!");
 })();
